@@ -36,7 +36,7 @@ const TCHAR NPP_PLUGIN_NAME[] = TEXT("eGateway decrypt log plugin");
 //
 // Here define the number of your plugin commands
 //
-const int nbFunc = 2;
+const int nbFunc = 3;
 
 
 //
@@ -70,7 +70,7 @@ bool setCommand(size_t index, TCHAR *cmdName, PFUNCPLUGINCMD pFunc, ShortcutKey 
 //
 // Your plugin command functions
 //
-void SelectEncryptLogDirectory();
-void DockableDlgDemo();
+void SelectEncryptedLogDirectory();
+void AboutMsgBox();
 
 #endif //PLUGINDEFINITION_H

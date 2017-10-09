@@ -1,1 +1,1 @@
-xcopy /Y /S "D:\Code\my\eGatewayLogDecryptPlugin\vs.proj\Debug\eGatewayLogDecryptPlugin.dll" "C:\Program Files\Notepad++\plugins"
+xcopy /Y /S "D:\Code\my\eGatewayDecryptLogPlugin\vs.proj\Debug\eGatewayDecryptLogPlugin.dll" "C:\Program Files\Notepad++\plugins"

@@ -1,0 +1,36 @@
+
+/*
+this file is part of notepad++
+Copyright (C)2003 Don HO ( donho@altern.org )
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either
+version 2 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+*/
+
+#include <windows.h>
+#include "resource.h"
+
+IDD_PLUGIN_SELECT_DIRECTORY DIALOGEX 26, 41, 155, 251
+STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU
+EXSTYLE WS_EX_TOOLWINDOW | WS_EX_WINDOWEDGE
+CAPTION "Select encrypted log directory #"
+FONT 8, "MS Sans Serif", 0, 0, 0x0
+BEGIN
+    LTEXT           "Encrypted log dir:",ID_STATIC_TEXT,9,22,95,8
+    EDITTEXT        ID_EDIT_ENCRYPTED_LOG_DIR,9,43,138,12,ES_NUMBER
+    DEFPUSHBUTTON   "&Select",IDOK,77,21,70,14,BS_NOTIFY
+    CONTROL         "",IDC_LIST_LOG_FILES,"listbox",WS_CHILDWINDOW | WS_VISIBLE | SS_LEFT | WS_HSCROLL | WS_VSCROLL ,9,65,138,183
+	PUSHBUTTON   "&Re-decrypt file",ID_REDECRYPT_FILE,9,252,138,14,BS_NOTIFY
+END
+

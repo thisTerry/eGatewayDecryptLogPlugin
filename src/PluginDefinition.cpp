@@ -18,15 +18,14 @@
 #include "PluginDefinition.h"
 #include "menuCmdID.h"
 
-#include "DockingFeature/GoToLineDlg.h"
-#include "DockingFeature/SelectEncryptLogDirDlg.h"
+#include "DockingFeature/SelectEncryptedLogDirDlg.h"
 
 const TCHAR sectionName[] = TEXT("CONFIG");
-const TCHAR keyName1[] = TEXT("EncryptLogDir");
-const TCHAR keyName2[] = TEXT("PannelClosed");
+const TCHAR encrypedLogDir[] = TEXT("EncryptedLogDir");
+const TCHAR isPannelOpen[] = TEXT("IsPannelOpen");
 const TCHAR configFileName[] = TEXT("eGatewayDecryptLogPlugin.ini");
-DemoDlg _goToLine;
-SelectEncryptLogDirDlg _selectEncryptLogDirDlg;
+const TCHAR defEncryptedLogDir[] = TEXT("C:\\Program Data\\Mindray\\eGateway\\eGatewayLogs");
+SelectEncryptedLogDirDlg _selectEncryptLogDirDlg;
 //
 // The plugin data that Notepad++ needs
 //
@@ -38,15 +37,14 @@ FuncItem funcItem[nbFunc];
 NppData nppData;
 
 TCHAR iniFilePath[MAX_PATH];
-bool doCloseTag = false;
-#define DOCKABLE_DEMO_INDEX 15
+bool isOpenTag = false;
+#define DOCKABLE_DECRYPT_LOG_INDEX 0
 //
 // Initialize your plugin data here
 // It will be called while plugin loading   
 void pluginInit(HANDLE hModule)
 {
 	// Initialize dockable demo dialog
-	_goToLine.init((HINSTANCE)hModule, NULL);
     _selectEncryptLogDirDlg.init((HINSTANCE)hModule, NULL);
 }
 
@@ -55,7 +53,13 @@ void pluginInit(HANDLE hModule)
 //
 void pluginCleanUp()
 {
-	::WritePrivateProfileString(sectionName, keyName2, doCloseTag?TEXT("1"):TEXT("0"), iniFilePath);
+    // last open state
+	::WritePrivateProfileString(sectionName, isPannelOpen, isOpenTag?TEXT("1"):TEXT("0"), iniFilePath);
+    
+    // last folder path
+    TCHAR  folderPath[MAX_PATH + 1] = {0};
+    GetCurrentDirectory(_countof(folderPath),folderPath);
+    ::WritePrivateProfileString(sectionName, encrypedLogDir, folderPath, iniFilePath);
 }
 
 //
@@ -63,7 +67,6 @@ void pluginCleanUp()
 // You should fill your plugins commands here
 void commandMenuInit()
 {
-
 	// get path of plugin configuration
 	::SendMessage(nppData._nppHandle, NPPM_GETPLUGINSCONFIGDIR, MAX_PATH, (LPARAM)iniFilePath);
 
@@ -77,7 +80,7 @@ void commandMenuInit()
 	PathAppend(iniFilePath, configFileName);
 
 	// get the parameter value from plugin config
-	doCloseTag = (::GetPrivateProfileInt(sectionName, keyName2, 0, iniFilePath) != 0);
+	isOpenTag = (::GetPrivateProfileInt(sectionName, isPannelOpen, 0, iniFilePath) != 0);
 
     //--------------------------------------------//
     //-- STEP 3. CUSTOMIZE YOUR PLUGIN COMMANDS --//
@@ -89,8 +92,18 @@ void commandMenuInit()
     //            ShortcutKey *shortcut,          // optional. Define a shortcut to trigger this command
     //            bool check0nInit                // optional. Make this menu item be checked visually
     //            );
-    setCommand(0, TEXT("Set encrypt log directory"), SelectEncryptLogDirectory, NULL, false);
-	setCommand(1, TEXT("Dockable Dialog Demo"), DockableDlgDemo, NULL, false);
+
+    // Shortcut :
+    // Following code makes the first command
+    // bind to the shortcut Alt-Q
+    ShortcutKey *shKey = new ShortcutKey;
+    shKey->_isAlt = true;
+    shKey->_isCtrl = false;
+    shKey->_isShift = false;
+    shKey->_key = 0x33; //VK_3
+    setCommand(0, TEXT("Select encrypted log directory"), SelectEncryptedLogDirectory, shKey, false);
+    setCommand(1, TEXT("---"), NULL, NULL, false);
+    setCommand(2, TEXT("About"), AboutMsgBox, NULL, false);
 }
 
 //
@@ -99,6 +112,8 @@ void commandMenuInit()
 void commandMenuCleanUp()
 {
 	// Don't forget to deallocate your shortcut here
+    // Don't forget to deallocate your shortcut here
+    delete funcItem[0]._pShKey;
 }
 
 
@@ -125,9 +140,8 @@ bool setCommand(size_t index, TCHAR *cmdName, PFUNCPLUGINCMD pFunc, ShortcutKey 
 //-- STEP 4. DEFINE YOUR ASSOCIATED FUNCTIONS --//
 //----------------------------------------------//
 
-void SelectEncryptLogDirectory()
+void SelectEncryptedLogDirectory()
 {
-    //::MessageBox(NULL, TEXT("Hello, Notepad++!"), TEXT("Notepad++ Plugin Template"), MB_OK);
     _selectEncryptLogDirDlg.setParent(nppData._nppHandle);
     tTbData	data = {0};
 
@@ -142,38 +156,23 @@ void SelectEncryptLogDirectory()
 
         // the dlgDlg should be the index of funcItem where the current function pointer is
         // in this case is DOCKABLE_DEMO_INDEX
-        data.dlgID = DOCKABLE_DEMO_INDEX;
+        data.dlgID = DOCKABLE_DECRYPT_LOG_INDEX;
         ::SendMessage(nppData._nppHandle, NPPM_DMMREGASDCKDLG, 0, (LPARAM)&data);
     }
+    
     _selectEncryptLogDirDlg.display();
+
+    TCHAR  folderPath[MAX_PATH + 1] = {0};
+    ::GetPrivateProfileString(sectionName, encrypedLogDir, defEncryptedLogDir, folderPath, _countof(folderPath), iniFilePath);
+    _selectEncryptLogDirDlg.setLastLogDir(folderPath);
 }
 
-
-// Dockable Dialog Demo
-// 
-// This demonstration shows you how to do a dockable dialog.
-// You can create your own non dockable dialog - in this case you don't nedd this demonstration.
-// You have to create your dialog by inherented DockingDlgInterface class in order to make your dialog dockable
-// - please see DemoDlg.h and DemoDlg.cpp to have more informations.
-void DockableDlgDemo()
+void AboutMsgBox()
 {
-	_goToLine.setParent(nppData._nppHandle);
-	tTbData	data = {0};
-
-	if (!_goToLine.isCreated())
-	{
-		_goToLine.create(&data);
-
-		// define the default docking behaviour
-		data.uMask = DWS_DF_CONT_RIGHT;
-
-		data.pszModuleName = _goToLine.getPluginFileName();
-
-		// the dlgDlg should be the index of funcItem where the current function pointer is
-		// in this case is DOCKABLE_DEMO_INDEX
-		data.dlgID = DOCKABLE_DEMO_INDEX;
-		::SendMessage(nppData._nppHandle, NPPM_DMMREGASDCKDLG, 0, (LPARAM)&data);
-	}
-	_goToLine.display();
+    WCHAR text[1024] = {0};
+    swprintf_s(text, 
+        L"Version:   v1.0 \n\n "
+        L"Developer: Terry/Ding Yankun, Oct 8th,2017\n\n "
+        L"Usage:     Select the encrypted log directory, and double clicked the file name in the listbox.");
+    ::MessageBox(nppData._nppHandle, text, NPP_PLUGIN_NAME, MB_OK);
 }
-
