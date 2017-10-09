@@ -32,9 +32,15 @@ INT_PTR CALLBACK SelectEncryptedLogDirDlg::run_dlgProc(UINT message, WPARAM wPar
             }
 
             //////////////////////////////////////////////////////////////////////////
+            if (LOWORD (wParam) == IDC_LIST_LOG_FILES)
+            {
+                int d = HIWORD (wParam);
+                WCHAR text[128] = {0};
+                swprintf_s(text, _countof(text), L"########MSG TYPE: %d\n", d);
+                OutputDebugStringW(text);
+            }
             if (LOWORD (wParam) == IDC_LIST_LOG_FILES && HIWORD (wParam) == LBN_DBLCLK)
             {
-                ::EnableWindow(GetDlgItem(_hSelf, ID_REDECRYPT_FILE), TRUE);
                 onListboxLButtonDoubleClicked(wParam, lParam);
                 return 0 ;
             }
@@ -68,17 +74,6 @@ void SelectEncryptedLogDirDlg::onInitDialg(WPARAM /*wParam*/, LPARAM /*lParam*/)
         swprintf_s(text, _countof(text), L"GetDlgItem IDC_LIST_LOG_FILES handle failed, error:%d", error);
         ::MessageBox(_hSelf, text, L"ERROR", MB_OK);
     }
-
-    _OldListProc = (WNDPROC) SetWindowLong (hwndList, GWL_WNDPROC,(LPARAM) ListProc) ;
-    if (NULL == _OldListProc)
-    {
-        int error = GetLastError();
-        WCHAR text[128] = {0};
-        swprintf_s(text, _countof(text), L"SetWindowLong GWL_WNDPROC failed, error:%d", error);
-        ::MessageBox(_hSelf, text, L"ERROR", MB_OK);
-    }
-
-    SetWindowLong(hwndList, GWL_USERDATA,(LONG)this);
 
     //////////////////////////////////////////////////////////////////////////
     ::EnableWindow(GetDlgItem(_hSelf, ID_REDECRYPT_FILE), FALSE);
@@ -143,6 +138,7 @@ void SelectEncryptedLogDirDlg::onListboxLButtonDoubleClicked(WPARAM /*wParam*/, 
     {
         CloseHandle (hFile) ;
         bValidFile = TRUE ;
+        ::EnableWindow(GetDlgItem(_hSelf, ID_REDECRYPT_FILE), TRUE);
 
         if (isDecryptLog(decryptedFileName))
         {
@@ -163,6 +159,8 @@ void SelectEncryptedLogDirDlg::onListboxLButtonDoubleClicked(WPARAM /*wParam*/, 
     else
     {
         bValidFile = FALSE ;
+        ::EnableWindow(GetDlgItem(_hSelf, ID_REDECRYPT_FILE), FALSE);
+
         szBuffer [lstrlen (szBuffer) - 1] = '\\' ;
         szBuffer [0] = L'\\';
 
@@ -261,32 +259,6 @@ bool SelectEncryptedLogDirDlg::displayFileContent(const WCHAR* filePath)
         //::MessageBox(_hSelf, text, L"ERROR", MB_OK);
     }
     return (0 != ret);
-}
-
-
-LRESULT CALLBACK SelectEncryptedLogDirDlg::ListProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    SelectEncryptedLogDirDlg* pDlg = (SelectEncryptedLogDirDlg*)GetWindowLong( hwnd,GWL_USERDATA);
-    if (NULL != pDlg)
-    {
-        return pDlg->run_listProc( message, wParam, lParam);
-    }
-    return FALSE;
-}
-
-INT_PTR CALLBACK SelectEncryptedLogDirDlg::run_listProc(UINT message, WPARAM wParam, LPARAM lParam)
-{
-    if (message == WM_LBUTTONDBLCLK )
-    {
-        ::SendMessage (_hSelf, WM_COMMAND, MAKELONG (IDC_LIST_LOG_FILES, LBN_DBLCLK), (LPARAM) _hSelf) ;
-    }
-    else if (message == WM_LBUTTONDOWN)
-    {
-        ::SendMessage (_hSelf, WM_COMMAND, MAKELONG (IDC_LIST_LOG_FILES, LBN_SELCHANGE), (LPARAM) _hSelf) ;
-    }
-
-    HWND hwndList = ::GetDlgItem(_hSelf, IDC_LIST_LOG_FILES);
-    return CallWindowProc (_OldListProc, hwndList, message, wParam, lParam) ;
 }
 
 bool SelectEncryptedLogDirDlg::selectLogDir(WCHAR* folderPath, int /*length*/)

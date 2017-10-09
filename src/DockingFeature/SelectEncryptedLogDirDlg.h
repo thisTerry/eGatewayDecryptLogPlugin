@@ -27,8 +27,6 @@ public :
 
 protected :
     virtual INT_PTR CALLBACK run_dlgProc(UINT message, WPARAM wParam, LPARAM lParam);
-    static LRESULT CALLBACK ListProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
-    virtual INT_PTR CALLBACK run_listProc(UINT message, WPARAM wParam, LPARAM lParam);
 
 private:
     void onInitDialg(WPARAM wParam, LPARAM lParam);
@@ -44,9 +42,6 @@ private :
     bool isDecryptLog(const WCHAR* filePath);
     bool generateDecryptLogName(const WCHAR* filePath, WCHAR* decryptedFileName, int length);
     bool displayFileContent(const WCHAR* filePath);
-
-private:
-    WNDPROC _OldListProc ;
 };
 
 #endif //SELECT_ENCRYPTLOGDIR_DLG_H
