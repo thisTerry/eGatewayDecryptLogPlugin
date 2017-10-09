@@ -28,6 +28,8 @@
 #define	ID_STATIC_TEXT                  (IDD_PLUGIN_SELECT_DIRECTORY + 5)
 #define	IDC_LIST_LOG_FILES                  (IDD_PLUGIN_SELECT_DIRECTORY + 15)
 #define	ID_REDECRYPT_FILE                  (IDD_PLUGIN_SELECT_DIRECTORY + 20)
+#define	ID_STATIC_STATUS                  (IDD_PLUGIN_SELECT_DIRECTORY + 25)
+
 
 
 

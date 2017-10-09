@@ -11,6 +11,8 @@
 extern NppData nppData;
 
 static const WCHAR* DECRYPTED_LOG_APPENDIX = L".decrypted";
+static const WCHAR BACK_SLASH = 0x5c;
+static const WCHAR BACK_SLASH_STR[] = {0x5c, 0};
 
 INT_PTR CALLBACK SelectEncryptedLogDirDlg::run_dlgProc(UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -19,6 +21,13 @@ INT_PTR CALLBACK SelectEncryptedLogDirDlg::run_dlgProc(UINT message, WPARAM wPar
     case WM_INITDIALOG:
         {
             onInitDialg(wParam, lParam);
+            return 0;
+        }
+        break;
+
+    case WM_NOTIFY:
+        {
+            onNPPActiveDocChanged(wParam, lParam);
             return 0;
         }
         break;
@@ -44,12 +53,7 @@ INT_PTR CALLBACK SelectEncryptedLogDirDlg::run_dlgProc(UINT message, WPARAM wPar
                 onListboxLButtonDoubleClicked(wParam, lParam);
                 return 0 ;
             }
-            if (LOWORD (wParam) == IDC_LIST_LOG_FILES && HIWORD (wParam) == LBN_SELCHANGE)
-            {
-                ::EnableWindow(GetDlgItem(_hSelf, ID_REDECRYPT_FILE), FALSE);
-                return 0;
-            }
-                
+
             //////////////////////////////////////////////////////////////////////////
             if (ID_REDECRYPT_FILE == wParam)
             {
@@ -74,11 +78,15 @@ void SelectEncryptedLogDirDlg::onInitDialg(WPARAM /*wParam*/, LPARAM /*lParam*/)
         swprintf_s(text, _countof(text), L"GetDlgItem IDC_LIST_LOG_FILES handle failed, error:%d", error);
         ::MessageBox(_hSelf, text, L"ERROR", MB_OK);
     }
-
-    //////////////////////////////////////////////////////////////////////////
-    ::EnableWindow(GetDlgItem(_hSelf, ID_REDECRYPT_FILE), FALSE);
 }
 
+void SelectEncryptedLogDirDlg::onNPPActiveDocChanged(WPARAM wParam, LPARAM lParam)
+{
+    INT32* valuePtr = (INT32*)lParam;
+    HWND handleOfSender = (HWND)valuePtr[0];
+    UINT controlIdOfSender = valuePtr[1];
+    UINT notificationCode = valuePtr[2];
+}
 void SelectEncryptedLogDirDlg::onOKButtonPushed(WPARAM /*wParam*/, LPARAM /*lParam*/)
 {
     WCHAR folderPath[512] = {0};
@@ -98,7 +106,6 @@ void SelectEncryptedLogDirDlg::onOKButtonPushed(WPARAM /*wParam*/, LPARAM /*lPar
 void SelectEncryptedLogDirDlg::onListboxLButtonDoubleClicked(WPARAM /*wParam*/, LPARAM /*lParam*/)
 {
     static BOOL     bValidFile ;
-    static TCHAR    decryptedFileName[MAX_PATH + 1] = {0} ;
 
     TCHAR           szBuffer[MAX_PATH + 1] = {0};
     TCHAR           folderPath[MAX_PATH + 1] = {0};
@@ -125,9 +132,9 @@ void SelectEncryptedLogDirDlg::onListboxLButtonDoubleClicked(WPARAM /*wParam*/, 
 
     // file path test
     lstrcpy (filePath, folderPath) ;
-    if (filePath[lstrlen(filePath)-1] != L'\\')
+    if (filePath[lstrlen(filePath)-1] != BACK_SLASH)
     {
-        lstrcat(filePath, L"\\");
+        lstrcat(filePath, BACK_SLASH_STR);
     }
     lstrcat (filePath, szBuffer) ;
 
@@ -140,13 +147,11 @@ void SelectEncryptedLogDirDlg::onListboxLButtonDoubleClicked(WPARAM /*wParam*/, 
         bValidFile = TRUE ;
         ::EnableWindow(GetDlgItem(_hSelf, ID_REDECRYPT_FILE), TRUE);
 
-        if (isDecryptLog(decryptedFileName))
-        {
-            ::DeleteFile(decryptedFileName);
-        }
+        WCHAR decryptedFileName[MAX_PATH] = {0};
         if (generateDecryptLogName(filePath, decryptedFileName, _countof(decryptedFileName)))
         {
-            decryptLog(filePath, decryptedFileName, _countof(decryptedFileName));
+            processSameNameFile(filePath, decryptedFileName);
+            decryptLog(filePath, decryptedFileName);
             displayFileContent(decryptedFileName);
         }
         else
@@ -161,8 +166,8 @@ void SelectEncryptedLogDirDlg::onListboxLButtonDoubleClicked(WPARAM /*wParam*/, 
         bValidFile = FALSE ;
         ::EnableWindow(GetDlgItem(_hSelf, ID_REDECRYPT_FILE), FALSE);
 
-        szBuffer [lstrlen (szBuffer) - 1] = '\\' ;
-        szBuffer [0] = L'\\';
+        szBuffer [lstrlen (szBuffer) - 1] = BACK_SLASH ;
+        szBuffer [0] = BACK_SLASH;
 
         lstrcat(folderPath, szBuffer);
         ::SetDlgItemText(_hSelf, ID_EDIT_ENCRYPTED_LOG_DIR, folderPath);
@@ -176,12 +181,40 @@ void SelectEncryptedLogDirDlg::onListboxLButtonDoubleClicked(WPARAM /*wParam*/, 
 
 void SelectEncryptedLogDirDlg::onRedecryptFileButtonPushed(WPARAM wParam, LPARAM lParam)
 {
-    ::SendMessage(nppData._nppHandle, WM_COMMAND, IDM_FILE_CLOSE, 0);
-    onListboxLButtonDoubleClicked(wParam,lParam);
+    WCHAR decryptedFilePath[MAX_PATH] = {0};
+    WCHAR encryptedFilePath[MAX_PATH] = {0};
+    ::SendMessage(nppData._nppHandle, NPPM_GETFULLCURRENTPATH, _countof(decryptedFilePath), (LPARAM)decryptedFilePath);
+    bool isDecryptedFile = isDecryptLogFileName(decryptedFilePath) ;
+    bool doFileDecrypted = getEncryptedLogFileName(decryptedFilePath, encryptedFilePath, _countof(encryptedFilePath));
+    if (isDecryptedFile && doFileDecrypted)
+    {
+        HWND hwndList = ::GetDlgItem(_hSelf, IDC_LIST_LOG_FILES);
+        SendMessage (hwndList, LB_SETCURSEL, -1, 0);
+
+        ::DeleteFile(decryptedFilePath);
+        decryptLog(encryptedFilePath, decryptedFilePath);
+        ::SendMessage(nppData._nppHandle, WM_COMMAND, NPPM_RELOADFILE, (LPARAM)decryptedFilePath);
+        ::SetDlgItemText(_hSelf, ID_STATIC_STATUS, L"Re-decrypt file succeed.");
+    }
+    else
+    {
+        if (!isDecryptedFile)
+        {
+            ::SetDlgItemText(_hSelf, ID_STATIC_STATUS, L"File name invalid");
+        }
+        else if (!doFileDecrypted)
+        {
+            ::SetDlgItemText(_hSelf, ID_STATIC_STATUS, L"Please double click file name in listbox.");
+        }
+        else
+        {
+            ::SetDlgItemText(_hSelf, ID_STATIC_STATUS, L"Re-decrypt file failed.");
+        }
+    }
 }
 
 
-bool SelectEncryptedLogDirDlg::isDecryptLog(const WCHAR* filePath)
+bool SelectEncryptedLogDirDlg::isDecryptLogFileName(const WCHAR* filePath)
 {
     bool ret = false;
     int count = 0;
@@ -209,6 +242,21 @@ bool SelectEncryptedLogDirDlg::isDecryptLog(const WCHAR* filePath)
     return ret;
 }
 
+bool SelectEncryptedLogDirDlg::processSameNameFile(const WCHAR* encryptedFilePath, const WCHAR* decryptedFilePath)
+{
+    WCHAR tempPath[MAX_PATH] = {0};
+    if (getEncryptedLogFileName(decryptedFilePath, tempPath, _countof(tempPath)))
+    {
+        ::DeleteFile(decryptedFilePath);
+    }
+    else
+    {   
+        LogPathPair logPathPair;
+        logPathPair.SetPathPair(encryptedFilePath, decryptedFilePath);
+        _decryptedLogFilePathList.push_back(logPathPair);
+    }
+    return true;
+}
 bool SelectEncryptedLogDirDlg::generateDecryptLogName(const WCHAR* fileNamePath, WCHAR* decryptedFileName, int /*length*/)
 {
     TCHAR drive[MAX_PATH] = L"";
@@ -221,7 +269,7 @@ bool SelectEncryptedLogDirDlg::generateDecryptLogName(const WCHAR* fileNamePath,
     GetTempPath(MAX_PATH, strPath);  
 
     lstrcpy(decryptedFileName, strPath);
-    lstrcat(decryptedFileName, L"\\");
+    //lstrcat(decryptedFileName, BACK_SLASH_STR);
     lstrcat(decryptedFileName, filePath);
     lstrcat(decryptedFileName, ext);
     lstrcat(decryptedFileName, DECRYPTED_LOG_APPENDIX);
@@ -229,7 +277,7 @@ bool SelectEncryptedLogDirDlg::generateDecryptLogName(const WCHAR* fileNamePath,
     return true;
 }
 
-bool SelectEncryptedLogDirDlg::decryptLog(const WCHAR* encryptedFileName, WCHAR* decryptedFileName, int length)
+bool SelectEncryptedLogDirDlg::decryptLog(const WCHAR* encryptedFileName, const WCHAR* decryptedFileName)
 {
     return true;
 }
@@ -238,7 +286,7 @@ bool SelectEncryptedLogDirDlg::decryptLog(const WCHAR* encryptedFileName, WCHAR*
 bool SelectEncryptedLogDirDlg::displayFileContent(const WCHAR* filePath)
 {
     HANDLE hFile = NULL;
-    if (INVALID_HANDLE_VALUE == (hFile = CreateFile (filePath, 
+    if (INVALID_HANDLE_VALUE == (hFile = CreateFile(filePath, 
         GENERIC_READ, FILE_SHARE_READ, NULL, 
         OPEN_ALWAYS, 0, NULL)))
     {
@@ -248,17 +296,26 @@ bool SelectEncryptedLogDirDlg::displayFileContent(const WCHAR* filePath)
         ::MessageBox(_hSelf, text, L"ERROR", MB_OK);
     }
     LRESULT ret = ::SendMessage(nppData._nppHandle, NPPM_DOOPEN , 0, (LPARAM)filePath);
-    if (0 != ret)
-    {
-        // SUCCESS;
-    }
-    else
-    {
-        //WCHAR text[128] = {0};
-        //swprintf_s(text, _countof(text), L"displayFileContent failed");
-        //::MessageBox(_hSelf, text, L"ERROR", MB_OK);
-    }
     return (0 != ret);
+}
+
+bool SelectEncryptedLogDirDlg::getEncryptedLogFileName(const WCHAR* decryptedFilePath, WCHAR* encryptedFilePath, int /*length*/) const
+{
+    std::list<LogPathPair>::const_iterator it=_decryptedLogFilePathList.begin();
+    for (; it!=_decryptedLogFilePathList.end(); it++)
+    {
+        const LogPathPair& logPathPair = *it;
+        if (0 == lstrcmp(logPathPair.decryptedFilePath, decryptedFilePath))
+        {
+            if (NULL != encryptedFilePath)
+            {
+                //int minLength = (lstrlen(logPathPair.encryptedFilePath) < length) ? lstrlen(logPathPair.encryptedFilePath) : length;
+                lstrcpy(encryptedFilePath, logPathPair.encryptedFilePath);
+            }
+            return true;
+        }
+    }
+    return false;
 }
 
 bool SelectEncryptedLogDirDlg::selectLogDir(WCHAR* folderPath, int /*length*/)
@@ -290,13 +347,14 @@ bool SelectEncryptedLogDirDlg::fillFilesInTree(const WCHAR* folderPath)
     HWND hwndList = ::GetDlgItem(_hSelf, IDC_LIST_LOG_FILES);
     WCHAR text[MAX_PATH] = {0};
     lstrcpy(text, folderPath);
-    if (text[lstrlen(text)-1] == L'\\')
+    if (text[lstrlen(text)-1] == BACK_SLASH)
     {
         lstrcat(text, L"*");
     }
     else
     {
-        lstrcat(text, L"\\*");
+        lstrcat(text, BACK_SLASH_STR);
+        lstrcat(text, L"*");
     }   
     ::SendMessage (hwndList, LB_RESETCONTENT, 0, 0) ;
     ::SendMessage (hwndList, LB_DIR, DIRATTR, (LPARAM)text) ;
