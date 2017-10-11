@@ -287,13 +287,17 @@ bool SelectEncryptedLogDirDlg::displayFileContent(const WCHAR* filePath)
 {
     HANDLE hFile = NULL;
     if (INVALID_HANDLE_VALUE == (hFile = CreateFile(filePath, 
-        GENERIC_READ, FILE_SHARE_READ, NULL, 
+        0, FILE_SHARE_READ, NULL, 
         OPEN_ALWAYS, 0, NULL)))
     {
         int error = GetLastError();
         WCHAR text[128] = {0};
         swprintf_s(text, _countof(text), L"displayFileContent failed, error: %d", error);
         ::MessageBox(_hSelf, text, L"ERROR", MB_OK);
+    }
+    else
+    {
+        CloseHandle (hFile) ;
     }
     LRESULT ret = ::SendMessage(nppData._nppHandle, NPPM_DOOPEN , 0, (LPARAM)filePath);
     return (0 != ret);
